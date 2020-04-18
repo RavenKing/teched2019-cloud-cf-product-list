@@ -1,0 +1,13 @@
+applications:
+# Product List Application
+- name: product-listDemo
+  instances: 1
+  memory: 128M
+ # routes:
+ #   - route: backendCAI.cf.us10.hana.ondemand.com
+  path: .
+  buildpacks:
+    - nodejs_buildpack  
+  timeout: 180
+  services: 
+    - educationTime-hdidb-kevinyang02sapnm1WGmRPC2yiZZH0

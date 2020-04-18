@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+	    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>kevinFront</title>
+		<script id="sap-ui-bootstrap"
+			src="https://sapui5.hana.ondemand.com/resources/sap-ui-core.js"
+			data-sap-ui-theme="sap_fiori_3"
+			data-sap-ui-resourceroots='{"com.sap.kevin.kevinFront": "./"}'
+			data-sap-ui-compatVersion="edge"
+			data-sap-ui-oninit="module:sap/ui/core/ComponentSupport"
+			data-sap-ui-async="true"
+			data-sap-ui-frameOptions="trusted">
+		</script>
+		
+		
+	<script>
+	
+	$.ajax({url: "https://approuterbackendcai.cfapps.us10.hana.ondemand.com/products/tokenOLD", success: function(result){
+    window.webchatMethods = {
+        // called at each user message
+        getMemory: (conversationId) => {
+         const memory = { token: result }
+         return { memory, merge: true }
+       }
+     }
+  }});
+    </script>
+	</head>
+	<body class="sapUiBody">
+		<div data-sap-ui-component data-name="com.sap.kevin.kevinFront" data-id="container" data-settings='{"id" : "kevinFront"}'></div>
+	</body>
+</html>

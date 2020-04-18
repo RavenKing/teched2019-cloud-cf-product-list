@@ -9,7 +9,11 @@
   "author": "John Doe",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.17.1"
+    "@sap/hana-client":"^2.4.191",
+    "express": "^4.17.1",
+    "@sap/xsenv": "^2.2.0",
+    "@sap/xssec": "^2.2.4",
+    "passport": "^0.4.1"
   },
   "devDependencies": {
     "request": "^2.88.0"
