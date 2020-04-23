@@ -31,7 +31,7 @@ function sendMessage(){
         console.log(error);
     });
     client.connect();
-
+   // initTasks(taskList, client);
 }
 
 function setupOptions(tasks, options) {
@@ -71,6 +71,7 @@ function initTasks(tasks, client) {
             }
             //setTimeout(handler, getRandomInt(task.timerMin, task.timerMax));
             counter++;
+            client.disconnect();
         };
 
         stream.on('drain', () => {
