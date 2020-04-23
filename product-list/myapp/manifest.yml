@@ -1,13 +1,25 @@
 applications:
 # Product List Application
-- name: product-listDemo
+- name: enterpriseMDemo
   instances: 1
   memory: 128M
  # routes:
  #   - route: backendCAI.cf.us10.hana.ondemand.com
   path: .
-  buildpacks:
-    - nodejs_buildpack  
+  buildpack: https://github.com/cloudfoundry/nodejs-buildpack
   timeout: 180
-  services: 
-    - educationTime-hdidb-kevinyang02sapnm1WGmRPC2yiZZH0
+  services:
+    - kevin-em
+env:
+      SAP_JWT_TRUST_ACL: "[{\"clientid\":\"*\",\"identityzone\":\"*\"}]"
+      SAP_XBEM_BINDINGS: >
+        {
+          "inputs": {},
+          "outputs": {
+            "myOutA" : {
+              "service": "kevin-em",
+              "address": "topic:topic-demo",
+              "reliable": false
+            }
+          }
+        }

@@ -1,262 +1,86 @@
 'use strict';
-const request = require('request');
 const xsenv = require('@sap/xsenv');
-const API_EndPoint = "backendOnpremise";
-var globalconnectivityToken;
-/***
- * Extract client id, client secret and url from the bound Destinations service VCAP_SERVICES object
- *
- * when the promise resolves it returns a clientid, clientsecret and url of the token granting service
- *
- * @returns {Promise<any>}
- */
-function getCredentials() {
-    return new Promise(function (resolve) {
-        const destination = xsenv.getServices({
-            destination: {
-                tag: 'destination'
-            }
-        }).destination;
+const msg = require('@sap/xb-msg');
+const env = require('@sap/xb-msg-env');
+const service = 'kevin-em';
+const taskList = {
+    myOutA : { topic: 'topic-demo' , timerMin: 1, timerMax: 11 }
+};
+var counter = 1;
 
-        const credentials = {
-            clientid: destination.clientid,
-            clientsecret: destination.clientsecret,
-            url: destination.url
-        };
+xsenv.loadEnv();
 
-        resolve(credentials);
+//------------------------------------------------------------------------------------------------------------------
+// Start messaging client
+//------------------------------------------------------------------------------------------------------------------
+
+let client = new msg.Client(env.msgClientOptions(service, [], ['myOutA']));
+
+function sendMessage(){
+    console.log("start messaging")
+
+    client
+    .on('connected', () => {
+        console.log('connected');
+        initTasks(taskList, client);
+    })
+    .on('drain', () => {
+        console.log('continue');
+    })
+    .on('error', (error) => {
+        console.log(error);
     });
-}
-function getConnectivityCredentials() {
-    return new Promise(function (resolve) {
-        const connectivity = xsenv.getServices({
-            connectivity: {
-                tag: 'connectivity'
-            }
-        }).connectivity;
+    client.connect();
 
-        const connectivitycredentials = {
-            proxy: "http://" + connectivity.onpremise_proxy_host + ":" + connectivity.onpremise_proxy_port,
-            clientid: connectivity.clientid,
-            clientsecret: connectivity.clientsecret,
-            url: connectivity.url
-        };
-
-        resolve(connectivitycredentials);
-    });
 }
 
-function getConnectivityReady() {
-    getConnectivityCredentials().then((credentials) => {
-        createToken(credentials.url, credentials.clientid, credentials.clientsecret).then((connectivityToken) => {
-            globalconnectivityToken = connectivityToken
+function setupOptions(tasks, options) {
+    Object.getOwnPropertyNames(tasks).forEach((id) => {
+        const task = tasks[id];
+        options.destinations[0].ostreams[id] = {
+            channel: 1,
+            exchange: 'amq.topic',
+            routingKey: task.topic
+        };
+    });
+    return options;
+}
+
+function getRandomInt(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return (Math.floor(Math.random() * (max - min + 1)) + min) * 1000;
+}
+
+function initTasks(tasks, client) {
+    Object.getOwnPropertyNames(tasks).forEach((id) => {
+        const task = tasks[id];
+        const stream = client.ostream(id);
+
+        const handler = () => {
+            console.log('publishing message number ' + counter + ' to topic ' + task.topic);
+
+            const message = {
+                target: { address: 'topic:' + task.topic },
+                payload: Buffer.from("Demo Message Number " + counter)
+
+            };
+            if (!stream.write(message)) {
+                console.log('wait');
+                return;
+            }
+            //setTimeout(handler, getRandomInt(task.timerMin, task.timerMax));
+            counter++;
+        };
+
+        stream.on('drain', () => {
+            //setTimeout(handler, getRandomInt(task.timerMin, task.timerMax));
         });
 
-    });
-}
-/***
- * This creates a token for us from the supplied token granting service url, the clientid and the client
- * secret when the promise resolves
- *
- * The return value when the promise resolves is an object and not a string. The request API will turn the response
- * from a string into an object for us.
- *
- * @param destAuthUrl : url of the destination service token granting service - you will still need to append /oath/token to the url
- * @param clientId: the clientId used to get a token from the
- * @param clientSecret : the password to get a token
- * @returns {Promise<any>}
- */
-function createToken(destAuthUrl, clientId, clientSecret) {
-    return new Promise(function (resolve, reject) {
-        // we make a post using x-www-form-urlencoded encoding for the body and for the authorization we use the
-        // clientid and clientsecret.
-        // Note we specify a grant_type and client_id as required to get the token
-        // the request will return a JSON object already parsed
-        request({
-            url: `${destAuthUrl}/oauth/token`,
-            method: 'POST',
-            json: true,
-            form: {
-                grant_type: 'client_credentials',
-                client_id: clientId
-            },
-            auth: {
-                user: clientId,
-                pass: clientSecret
-            }
-        },
-            function (error, response, body) {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve(body.access_token);
-                }
-            });
+        setTimeout(handler, getRandomInt(task.timerMin, task.timerMax));
     });
 }
 
-/***
- * This gets the destination using the supplied access token. We generated the access token using
- * createToken above.
- *
- * The destination has the uri field that holds the server(url) that will enable us to get the
- * destination details.
- *
- * -----------------------------------------
- * NOTE WE ASSUME A DESTINATION OF testdest
- * -----------------------------------------
- *
- * As above we do a GET request but instead of authentication we supply a bearer and access token
- * which give us access to the destination service for our service.
- *
- * The return value when the promise resolves is an object and not a string. The request API will turn the response
- * from a string into an object for us.
- *
- * @param access_token : the access token giving us access to the destination service
- * @param destinationName : the name of the destination to retrieve.
- * @returns {Promise<any>}
- */
-function getDestination(access_token, destinationName) {
-    return new Promise(function (resolve, reject) {
-        const destination = xsenv.getServices({ destination: { tag: 'destination' } }).destination;
-        console.log("ACCESS TOKEN = " + access_token);
-        // Note that we use the uri and not the url!!!!
-
-        request({
-            url: `${destination.uri}/destination-configuration/v1/destinations/${destinationName}`,
-            method: 'GET',
-            auth: {
-                bearer: access_token,
-            },
-            json: true,
-        },
-            function (error, response, body) {
-                if (error) {
-                    console.error(`Error retrieving destination ${error.toString()}`);
-                    reject(error);
-                } else {
-                    // console.log(`Retrieved destination ${JSON.stringify(body)}`);
-                    resolve(body.destinationConfiguration);
-                }
-            });
-    });
-}
-
-function readOrderDetailsDestinationUrl() {
-    const destinationCool = xsenv.getServices({
-        destination: {
-            tag: 'destination'
-        }
-    }).destination;
-    return new Promise(function (resolve, reject) {
-        getCredentials()
-            .then(function (credentials) {
-                return createToken(credentials.url, credentials.clientid, credentials.clientsecret)
-            })
-            .then(function (access_token) {
-                return getDestination(access_token, API_EndPoint);
-            })
-            .then(function (destination) {
-                const url = `${destination.URL}`;
-                // console.log("credential:" + json.stringify(destination));
-                console.log(`Accessing ODATA URL ${url}`);
-                resolve({
-                    url: url,
-                    user: destination.User,
-                    password: destination.Password
-                });
-            })
-            .catch(function (error) {
-                console.error(`Error getting Order_Details destination URL`);
-                reject(error);
-            })
-    });
-}
-
-function readOrderDetails(req, res, next) {
-
-    res.send({
-        replies: [{
-            type: 'text',
-            content: "We have " + 10 + "entities"
-        }],
-    });
-
-    const connectivity = xsenv.getServices({
-        connectivity: {
-            tag: 'connectivity'
-        }
-    }).connectivity;
-    const connectivitycredentials = {
-        proxy: "http://" + connectivity.onpremise_proxy_host + ":" + connectivity.onpremise_proxy_port,
-        clientid: connectivity.clientid,
-        clientsecret: connectivity.clientsecret,
-        url: connectivity.url
-    };
-    return new Promise(function (resolve, reject) {
-        console.log(`Getting destination url for Order_Details odata collection`);
-        readOrderDetailsDestinationUrl()
-            .then(function (result) {
-                console.log(`Read destiantion url ${result.url}`);
-                const final_url = result.url;
-                getConnectivityCredentials().then(function (connectivityCre) {
-
-                    return createToken(connectivityCre.url, connectivityCre.clientid, connectivityCre.clientsecret);
-                    //connectivityCre.
-                }).then((connectivity_access_token) => {
-                    console.log("connectivi prepared:" + result.user + "///token");
-                    var options = {
-                        // uri: dataObj.destinationConfiguration.URL + odata_path + "('" + odata_key_value + "')?$format=json",
-                        proxy: connectivitycredentials.proxy,
-                        uri: final_url,
-                        //proxy: getConnectivityCredentials().then(),
-                        headers: {
-                            "Content-Type": "application/json",
-                            "x-csrf-token": "Fetch",
-                            "Authorization": "Basic " + new Buffer(result.user + ":" + result.password).toString("base64"),
-                            "Proxy-Authorization": "Bearer " + connectivity_access_token,
-                            "SAP-Connectivity-SCC-Location_ID": "Shenzhen"
-                        }
-                    };
-                    request.get(options, function (error, response) {
-
-                        //console.log(response);
-                        console.log(response.body)
-                        var ste = JSON.parse(response.body);
-                        console.log(ste);
-                        res.send({
-                            replies: [{
-                                type: 'text',
-                                content: "We have " + ste.d.EntitySets.length + "entities"
-                            }],
-                        });
-                    });
-
-
-                });
-
-                //     request({
-                //         method: 'GET',
-                //         url: `${url}/v2/northwind/northwind.svc/Order_Details`,
-                //         json: true
-                //     }, function (error, response) {
-                //         if (error) {
-                //             console.error(`Error getting odata from Order_Details API ${error.toString()}`);
-                //             reject(error);
-                //         } else {
-                //             console.log(`Received Odata from wishlist API`);
-                //             console.log(response.body);
-                //             res.send(response.body);
-                //         }
-                //     })
-                // })
-                // .catch(function (error) {
-                //     console.error(`Failed reading Order_Details data - ${error.toString()}`);
-                //     reject(error);
-                // });
-            });
-    });
-}
 module.exports = {
-    readOrderDetails: readOrderDetails
+    sendMessage: sendMessage
 }

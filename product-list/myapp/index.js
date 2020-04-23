@@ -1,12 +1,11 @@
 const express = require('express');
-const { getProducts, getProductsByName} = require('./lib/repository');
-const { readOrderDetails} = require('./lib/destination');
+const { sendMessage } = require('./lib/destination');
 const app = express();
 const port = process.env.port || 8080;
 // secure the direct call to the application
-const passport = require('passport');
-const { JWTStrategy } = require('@sap/xssec');
-const xsenv = require('@sap/xsenv');
+// const passport = require('passport');
+// const { JWTStrategy } = require('@sap/xssec');
+// const xsenv = require('@sap/xsenv');
 
 // // XSUAA Middleware
 // passport.use(new JWTStrategy(xsenv.getServices({uaa:{tag:'xsuaa'}}).uaa));
@@ -14,15 +13,20 @@ const xsenv = require('@sap/xsenv');
 // app.use(passport.initialize());
 // app.use(passport.authenticate('JWT', { session: false }));
 
-app.get('/products',checkReadScope, getProducts);
+app.get('/sendEnterpriseMessage',checkReadScope, sendMessageQ);
  //app.get('/token',checkReadScope, getJWTToken);
-app.get('/orders',checkReadScope, readOrderDetails);
+//capp.get('/orders',checkReadScope, readOrderDetails);
 
 // function getJWTToken(req,res)
 // {
 // 	const authHeader=req.headers['authorization'];
 //    res.send(authHeader.split(' ')[1]);
 // }
+function  sendMessageQ(req,res)
+{
+	sendMessage();
+	res.send({reply:"sent one demo message"})
+}
 
 // Scope check
 function checkReadScope(req, res, next) {
