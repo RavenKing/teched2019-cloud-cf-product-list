@@ -1,20 +1,78 @@
 'use strict';
 const xsenv = require('@sap/xsenv');
 const msg = require('@sap/xb-msg');
-const env = require('@sap/xb-msg-env');
+const msgenv = require('@sap/xb-msg-env');
 const service = 'kevin-em';
 const taskList = {
     myOutA : { topic: 'topic-demo' , timerMin: 1, timerMax: 11 }
 };
 var counter = 1;
+//input 
+const inputX = process.env.XBEM_INPUT_X;
+const reconnect_retry_ms = process.env.RECONNECT_RETRY_MS;
 
+// Get options from CF environment
+const options = msgenv.msgClientOptions(service, [inputX], []);
 xsenv.loadEnv();
 
 //------------------------------------------------------------------------------------------------------------------
 // Start messaging client
 //------------------------------------------------------------------------------------------------------------------
 
-let client = new msg.Client(env.msgClientOptions(service, [], ['myOutA']));
+let client = null;
+
+function readMessage(res)
+{
+    client = new msg.Client(options);
+    //------------------------------------------------------------------------------------------------------------------
+    // Messaging client handler methods
+    //------------------------------------------------------------------------------------------------------------------
+
+    client
+    .on('connected', () => {
+      console.log('connected to enterprise messaging service');
+    })
+    .on('error', (err) => {
+      console.log('error on enterprise messaging service occurred ' + err);
+    })
+    .on('disconnected', (hadError) => {
+      console.log('connection to enterprise messaging service lost, trying to reconnect in ' + reconnect_retry_ms + ' ms');
+      setTimeout(()=> client.connect(), reconnect_retry_ms);
+    });
+
+    //------------------------------------------------------------------------------------------------------------------
+    // Input stream handler methods
+    //------------------------------------------------------------------------------------------------------------------
+
+    client.istream(inputX)
+    .on('subscribed', () => {
+      console.log('subscribed to ' + inputX);
+    })
+    .on('ready', () => {
+      console.log('stream ready: ' + inputX);
+    })
+    .on('data', (message) => {
+
+      let topic = 'dummy';
+      if (message.source) {
+          if (typeof message.source === 'string') {
+              topic = message.source;
+          } else if (message.source.topic) {
+              topic = message.source.topic;
+          }
+      }
+
+      //------------------------------------------------------------------------------------------------------------------
+      // Write the message payload to the log file
+      //------------------------------------------------------------------------------------------------------------------
+
+      console.log('message received: ' + message.payload.toString());
+      res.send({message:message.payload.toString()});
+      message.done();
+
+    });
+    client.connect();
+}
 
 function sendMessage(){
     console.log("start messaging")
@@ -82,5 +140,6 @@ function initTasks(tasks, client) {
 }
 
 module.exports = {
-    sendMessage: sendMessage
+    sendMessage: sendMessage,
+    readMessage:readMessage
 }

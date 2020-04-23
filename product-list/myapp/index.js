@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendMessage } = require('./lib/destination');
+const { sendMessage,readMessage } = require('./lib/destination');
 const app = express();
 const port = process.env.port || 8080;
 // secure the direct call to the application
@@ -14,6 +14,7 @@ const port = process.env.port || 8080;
 // app.use(passport.authenticate('JWT', { session: false }));
 
 app.get('/sendEnterpriseMessage',checkReadScope, sendMessageQ);
+app.get('/readEnterpriseMessage',checkReadScope, getMessage);
  //app.get('/token',checkReadScope, getJWTToken);
 //capp.get('/orders',checkReadScope, readOrderDetails);
 
@@ -22,6 +23,10 @@ app.get('/sendEnterpriseMessage',checkReadScope, sendMessageQ);
 // 	const authHeader=req.headers['authorization'];
 //    res.send(authHeader.split(' ')[1]);
 // }
+function getMessage(req,res)
+{
+	readMessage(res);
+}
 function  sendMessageQ(req,res)
 {
 	sendMessage();

@@ -1,6 +1,6 @@
 applications:
 # Product List Application
-- name: enterpriseMDemo
+- name: enterpriseMConsumer
   instances: 1
   memory: 128M
  # routes:
@@ -12,14 +12,15 @@ applications:
     - kevin-em
 env:
       SAP_JWT_TRUST_ACL: "[{\"clientid\":\"*\",\"identityzone\":\"*\"}]"
+      XBEM_INPUT_X: "inputX"
+      RECONNECT_RETRY_MS : 5000
       SAP_XBEM_BINDINGS: >
-        {
-          "inputs": {},
-          "outputs": {
-            "myOutA" : {
-              "service": "kevin-em",
-              "address": "topic:topic-demo",
-              "reliable": false
+           {
+              "inputs": {
+                "inputX": {
+                  "service": "kevin-em",
+                  "address": "queue:topic-demo",
+                  "reliable": true
+                }
+              }
             }
-          }
-        }
