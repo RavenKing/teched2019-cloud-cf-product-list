@@ -7,6 +7,9 @@ const taskList = {
     myOutA : { topic: 'topic-demo' , timerMin: 1, timerMax: 11 }
 };
 var counter = 1;
+var connected=false;
+const hanaClient=require("@sap/hana-client");
+const connection = hanaClient.createConnection();
 //input 
 const inputX = process.env.XBEM_INPUT_X;
 const reconnect_retry_ms = process.env.RECONNECT_RETRY_MS;
@@ -21,8 +24,113 @@ xsenv.loadEnv();
 
 let client = null;
 
+
+
+function insertMessageIntoDB(data,res)
+{
+    if(connected==false)
+    {console.log("fk");}
+    else{
+    var sql="INSERT INTO \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::enterpriseMessagin.mesages\" VALUES('"+data+"')";
+    connection.exec(sql,(err,rows)=>{
+        console.log("do it later!success");
+    });}
+//     //connection = hanaClient.createConnection();
+//     if(connected==false)
+//     {
+//     getCredentials().then((result)=>{
+//         return insertDBMessage(data,result)
+//     }).then((result)=>{
+//     })
+// }else{
+
+}
+function insertDBMessage(data,result)
+{
+    return new Promise(function(resolve)
+    {
+        connection.connect(result,(err)=>{
+            if(err)
+            {
+                return
+            }
+            connected=true;
+            var sql="INSERT INTO \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::enterpriseMessagin.mesages\" VALUES('"+data+"')";
+            connection.exec(sql,(err,rows)=>{
+                console.log(err);
+                // connection.disconnect();
+                resolve(rows);
+            })
+        })
+    });
+}
+function getMessageFromDB(res)
+{
+     getCredentials().then((result)=>{
+      return getDBConnection(result)
+    }).then((result)=>{
+        //console.log(result);
+        res.send(result);
+    });
+}
+function getDBConnection(result)
+{
+    return new Promise(function(resolve)
+    {
+        connection.connect(result,(err)=>{
+         var sql="select * from  \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::enterpriseMessagin.mesages\"";
+            console.log(sql);
+            console.log(err);
+            connection.exec(sql,(err,rows)=>{
+                console.log(err);
+                console.log(rows);  
+                //connection.disconnect();
+                resolve(rows);
+
+            })
+        })
+    });
+}
+function getCredentials()
+{
+    return new Promise(function(resolve)
+    {
+        const hanaService=xsenv.getServices({
+            hanatrial:{
+                tag:'hana'
+            }
+        }).hanatrial
+       // console.log(hanaService);
+        const result = {
+            host: hanaService.host,
+            port: hanaService.port,
+            uid: hanaService.user,
+            pwd: hanaService.password,
+            sslValidateCertificate : "false",
+            encrypt: "true",
+            databaseName:"H00"   
+        }
+        resolve(result);
+    });
+
+}
+
+
+
 function readMessage(res)
 {
+
+    getCredentials().then((result)=>{
+        connection.connect(result,(err)=>{
+            if(err)
+            {
+                console.log("connection error"+err);
+                return;
+            }
+            connected=true;
+        })
+    })
+
     client = new msg.Client(options);
     //------------------------------------------------------------------------------------------------------------------
     // Messaging client handler methods
@@ -52,7 +160,6 @@ function readMessage(res)
       console.log('stream ready: ' + inputX);
     })
     .on('data', (message) => {
-
       let topic = 'dummy';
       if (message.source) {
           if (typeof message.source === 'string') {
@@ -61,15 +168,19 @@ function readMessage(res)
               topic = message.source.topic;
           }
       }
+      const handler = ()=>{
+          console.log("timeout Function");
+        insertMessageIntoDB(message.payload.toString(),res);
+      }
+      setTimeout(handler, getRandomInt(1, 11));
 
       //------------------------------------------------------------------------------------------------------------------
       // Write the message payload to the log file
       //------------------------------------------------------------------------------------------------------------------
 
       console.log('message received: ' + message.payload.toString());
-      res.send({message:message.payload.toString()});
       message.done();
-
+      //insertMessageIntoDB(message.payload.toString(),res); 
     });
     client.connect();
 }
@@ -139,7 +250,10 @@ function initTasks(tasks, client) {
     });
 }
 
+
 module.exports = {
+    getMessageFromDB:getMessageFromDB,
     sendMessage: sendMessage,
-    readMessage:readMessage
+    readMessage:readMessage,
+    insertMessageIntoDB:insertMessageIntoDB
 }

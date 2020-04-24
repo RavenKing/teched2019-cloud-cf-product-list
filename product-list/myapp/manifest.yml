@@ -10,6 +10,7 @@ applications:
   timeout: 180
   services:
     - kevin-em
+    - educationTime-hdidb-kevinyang02sapnm1WGmRPC2yiZZH0 
 env:
       SAP_JWT_TRUST_ACL: "[{\"clientid\":\"*\",\"identityzone\":\"*\"}]"
       XBEM_INPUT_X: "inputX"

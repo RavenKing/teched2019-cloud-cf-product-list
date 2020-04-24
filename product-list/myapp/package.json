@@ -14,6 +14,7 @@
     "@sap/xsenv": "^2.2.0",
     "@sap/xssec": "^2.2.4",
     "passport": "^0.4.1",
+    "body-parser":"^1.19.0",
     "@sap/xb-msg": ">=0.2.4",
     "@sap/xb-msg-amqp-v100": "^0.9.17",
     "@sap/xb-msg-env": ">=0.2.1"
