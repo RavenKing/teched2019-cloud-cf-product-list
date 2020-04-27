@@ -1,0 +1,27 @@
+applications:
+# Product List Application
+- name: product-listDemo
+  instances: 1
+  memory: 128M
+ # routes:
+ #   - route: backendCAI.cf.us10.hana.ondemand.com
+  path: myapp
+  buildpacks:
+    - nodejs_buildpack  
+  timeout: 180
+  services:
+    - myaccess
+- name: approuterDemoUse
+  path: approuter
+  buildpacks:
+    - nodejs_buildpack
+  memory: 128M
+  services:
+    - myaccess
+  env:
+    destinations: >
+      [
+        {"name":"products-destination",
+         "url":"https://product-listDemo.cfapps.eu10.hana.ondemand.com",
+         "forwardAuthToken": true}
+      ]
