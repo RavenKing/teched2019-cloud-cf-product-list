@@ -1,6 +1,6 @@
 applications:
 # Product List Application
-- name: enterpriseMConsumer
+- name: educationTime
   instances: 1
   memory: 128M
  # routes:
@@ -9,19 +9,4 @@ applications:
   buildpack: https://github.com/cloudfoundry/nodejs-buildpack
   timeout: 180
   services:
-    - kevin-em
     - educationTime-hdidb-kevinyang02sapnm1WGmRPC2yiZZH0 
-env:
-      SAP_JWT_TRUST_ACL: "[{\"clientid\":\"*\",\"identityzone\":\"*\"}]"
-      XBEM_INPUT_X: "inputX"
-      RECONNECT_RETRY_MS : 5000
-      SAP_XBEM_BINDINGS: >
-           {
-              "inputs": {
-                "inputX": {
-                  "service": "kevin-em",
-                  "address": "queue:topic-demo",
-                  "reliable": true
-                }
-              }
-            }

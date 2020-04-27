@@ -19,15 +19,15 @@ app.use(bodyParser.json());
 
 app.get('/sendEnterpriseMessage',checkReadScope, sendMessageQ);
 app.get('/readEnterpriseMessage',checkReadScope, getMessage);
-app.get('/getMessageFromDB',checkReadScope, dbGet);
-app.post('/insertMessage',checkReadScope, insertMessageTest);
+app.get('/educationTime',checkReadScope, dbGet);
+app.post('/educationTime',checkReadScope, insertMessageTest);
  //app.get('/token',checkReadScope, getJWTToken);
 //capp.get('/orders',checkReadScope, readOrderDetails);
 
 function insertMessageTest(req,res)
 {	
 	console.log(req.body);
-	insertMessageIntoDB(req.body.message,res);
+	insertMessageIntoDB(req.body,res);
 
 }
 function dbGet(req,res)

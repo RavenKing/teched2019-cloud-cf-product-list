@@ -1,66 +1,46 @@
 'use strict';
 const xsenv = require('@sap/xsenv');
-const msg = require('@sap/xb-msg');
-const msgenv = require('@sap/xb-msg-env');
 const service = 'kevin-em';
-const taskList = {
-    myOutA : { topic: 'topic-demo' , timerMin: 1, timerMax: 11 }
-};
-var counter = 1;
-var connected=false;
+
 const hanaClient=require("@sap/hana-client");
 const connection = hanaClient.createConnection();
-//input 
-const inputX = process.env.XBEM_INPUT_X;
-const reconnect_retry_ms = process.env.RECONNECT_RETRY_MS;
-
-// Get options from CF environment
-const options = msgenv.msgClientOptions(service, [inputX], []);
-xsenv.loadEnv();
-
-//------------------------------------------------------------------------------------------------------------------
-// Start messaging client
-//------------------------------------------------------------------------------------------------------------------
-
-let client = null;
-
-
 
 function insertMessageIntoDB(data,res)
 {
-    if(connected==false)
-    {console.log("fk");}
-    else{
-    var sql="INSERT INTO \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::enterpriseMessagin.mesages\" VALUES('"+data+"')";
-    connection.exec(sql,(err,rows)=>{
-        console.log("do it later!success");
-    });}
-//     //connection = hanaClient.createConnection();
-//     if(connected==false)
-//     {
-//     getCredentials().then((result)=>{
-//         return insertDBMessage(data,result)
-//     }).then((result)=>{
-//     })
-// }else{
 
+    getCredentials().then((result)=>{
+        return insertDBMessage(data,result)
+      }).then((result)=>{
+          console.log(result);
+          res.send({reply:result});
+      });
 }
 function insertDBMessage(data,result)
 {
     return new Promise(function(resolve)
     {
         connection.connect(result,(err)=>{
-            if(err)
+            
+            console.log("getData"+data);
+            if(data.eduData.length>0)
             {
-                return
+                for(var i=0;i<data.eduData.length;i++)
+                {
+                    var sql="INSERT INTO \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::edu_master.educationTime\" VALUES('"+data.user_id+"','"+
+                    data.calendar_week+"','"+data.eduData[i].edu_source+"','"+data.eduData[i].edu_topic+"',"
+                    +data.eduData[i].edu_duration+",'"+data.user_name+"','"+data.eduData[i].comment+"','"
+                    +data.eduData[i].edu_area+"','"+data.certificate_source+"','"+data.certificate_topic+"','"
+                    +data.certificate_area+"','"+data.team+"')";
+                      connection.exec(sql,(err,rows)=>{
+                        console.log(rows);
+                    })
+                }
             }
-            connected=true;
-            var sql="INSERT INTO \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::enterpriseMessagin.mesages\" VALUES('"+data+"')";
-            connection.exec(sql,(err,rows)=>{
-                console.log(err);
-                // connection.disconnect();
-                resolve(rows);
-            })
+            
+            resolve("done")
+
+            
+
         })
     });
 }
@@ -78,13 +58,13 @@ function getDBConnection(result)
     return new Promise(function(resolve)
     {
         connection.connect(result,(err)=>{
-         var sql="select * from  \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::enterpriseMessagin.mesages\"";
+         var sql="select * from  \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::edu_master.educationTime\"";
             console.log(sql);
             console.log(err);
             connection.exec(sql,(err,rows)=>{
                 console.log(err);
                 console.log(rows);  
-                //connection.disconnect();
+                connection.disconnect();
                 resolve(rows);
 
             })
