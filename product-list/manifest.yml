@@ -1,6 +1,6 @@
 applications:
 # Product List Application
-- name: product-listDemo
+- name: educationTime
   instances: 1
   memory: 128M
  # routes:
@@ -11,7 +11,8 @@ applications:
   timeout: 180
   services:
     - myaccess
-- name: approuterDemoUse
+    - educationTime-hdidb-kevinyang02sapnm1WGmRPC2yiZZH0
+- name: approuterEducationTime
   path: approuter
   buildpacks:
     - nodejs_buildpack
@@ -21,7 +22,7 @@ applications:
   env:
     destinations: >
       [
-        {"name":"products-destination",
-         "url":"https://product-listDemo.cfapps.eu10.hana.ondemand.com",
+        {"name":"educationTime",
+         "url":"https://educationTime.cfapps.us10.hana.ondemand.com",
          "forwardAuthToken": true}
       ]

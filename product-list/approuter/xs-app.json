@@ -1,8 +1,8 @@
 {
     "routes": [{
-      "source": "^/products",
+      "source": "^/education",
       "target": "/",
-      "destination": "products-destination"
+      "destination": "educationTime"
       
     }
   ]

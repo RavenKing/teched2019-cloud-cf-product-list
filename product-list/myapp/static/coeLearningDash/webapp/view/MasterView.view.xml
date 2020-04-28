@@ -1,0 +1,19 @@
+<mvc:View controllerName="coeLearningDash.coeLearningDash.controller.MasterView" xmlns:mvc="sap.ui.core.mvc" displayBlock="true"
+	xmlns="sap.m" xmlns:viz="sap.viz.ui5.controls" xmlns:m="sap.suite.ui.microchart" xmlns:l="sap.ui.layout">
+	<Shell id="shell">
+		<App id="app">
+			<pages>
+				<Page id="page" title="{i18n>title}">
+					<l:Splitter>
+						<viz:VizFrame xmlns="sap.viz" id="idStackedChart" vizType="stacked_column" width="100%" height="100%"></viz:VizFrame>
+						<viz:VizFrame xmlns="sap.viz" id="idStackedChart2" vizType="stacked_column" width="100%" height="100%"></viz:VizFrame>
+					</l:Splitter>
+					<l:Splitter>
+						<viz:VizFrame xmlns="sap.viz" id="PieChart" vizType="pie" width="100%" height="100%"></viz:VizFrame>
+						<viz:VizFrame xmlns="sap.viz" id="PieChart2" vizType="pie" width="100%" height="100%"></viz:VizFrame>
+					</l:Splitter>
+				</Page>
+			</pages>
+		</App>
+	</Shell>
+</mvc:View>

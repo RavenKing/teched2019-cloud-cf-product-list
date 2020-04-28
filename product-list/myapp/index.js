@@ -68,6 +68,7 @@ function checkReadScope(req, res, next) {
 
 // Serve static files
 app.use('/', express.static('static/webapp'));
+app.use('/reporting', express.static('reporting/webapp'));
 
 app.listen(port, () => {
 	console.log('%s listening at %s', app.name, port);
