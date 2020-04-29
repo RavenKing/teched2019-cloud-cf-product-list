@@ -1,0 +1,21 @@
+applications:
+- name: approuterYe
+  path: ./
+  buildpacks:
+    - nodejs_buildpack
+  memory: 256M
+  command: yarn start
+  services:
+    - myaccess
+    env:
+    destinations: >
+      [
+        {
+          "name":"ui5-sdk",
+          "url":"https://sapui5.hana.ondemand.com/1.38.41/"
+        },
+        {
+          "name": "api",
+          "url":"https://team-calendar-backend.cfapps.sap.hana.ondemand.com/"
+        }
+      ]

@@ -1,0 +1,26 @@
+applications:
+# Application
+- name: product-list
+  instances: 1
+  memory: 128MB
+  path: myapp
+  buildpacks:
+      - nodejs_buildpack  
+  timeout: 180
+  services:
+    - myuaa3
+# Application Router
+- name: kevinAPPapprouterew
+  path: approuter
+  buildpacks:
+    - nodejs_buildpack
+  memory: 128M
+  services:
+    - myuaa3
+  env:
+    destinations: >
+      [
+        {"name":"products-destination",
+         "url":"https://product-list.cfapps.us10.hana.ondemand.com",
+         "forwardAuthToken": true}
+      ]
