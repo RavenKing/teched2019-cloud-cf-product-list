@@ -8,7 +8,7 @@ applications:
       - nodejs_buildpack  
   timeout: 180
   services:
-    - myuaa3
+    - productxsuaa
 # Application Router
 - name: kevinAPPapprouterew
   path: approuter
@@ -16,7 +16,7 @@ applications:
     - nodejs_buildpack
   memory: 128M
   services:
-    - myuaa3
+    - productxsuaa
   env:
     destinations: >
       [
