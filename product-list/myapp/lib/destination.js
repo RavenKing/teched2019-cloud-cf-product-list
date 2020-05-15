@@ -1,6 +1,8 @@
 'use strict';
 const xsenv = require('@sap/xsenv');
-const service = 'kevin-em';
+const request = require('request');
+const axios = require('axios');
+
 
 const hanaClient=require("@sap/hana-client");
 const connection = hanaClient.createConnection();
@@ -44,12 +46,14 @@ function insertDBMessage(data,result)
         })
     });
 }
-function getMessageFromDB(res)
+function getMessageFromDB(req,res)
 {
      getCredentials().then((result)=>{
+    req.logger.info("Credential got");
       return getDBConnection(result)
     }).then((result)=>{
         //console.log(result);
+    req.logger.warn("DB connected");
         res.send(result);
     });
 }
@@ -92,148 +96,103 @@ function getCredentials()
         }
         resolve(result);
     });
-
 }
 
+function getAlertCredentials()
+{
+    return new Promise(function(resolve)
+    {
+        const hanaService=xsenv.getServices({
+            alert:{
+                label:'alert-notification'
+            }
+        }).alert
+        console.log(hanaService);
+    
+        resolve(hanaService);
+    });
+}
+function getAlertOAuthToken(result)
+{
+    return new Promise(function(resolve){
+        request({
+            url: result.oauth_url,
+            method: 'POST',
+            json: true,
+            form: {
+                grant_type: 'client_credentials',
+                client_id: result.client_id
+            },
+            auth: {
+                user: result.client_id,
+                pass: result.client_secret
+            }
+        },
+            function (error, response, body) {
+                if (error) {
+                    reject(error);
+                } else {
+                    body.url=result.url;
+                    resolve(body);
+                }
+            });
+    });
+}
+function sendNotificationFunction(result)
+{
+    return new Promise(function(resolve){
+
+        var data ={
+            "eventType": "good",
+            "eventTimestamp": 1535618178,
+            "resource": {
+                "resourceType":"kevin",
+                "resourceName":"Yangcf"
+            },
+            "severity": "FATAL",
+            "category": "ALERT",
+            "subject": "Sample Event Subject",
+            "body": "Sample event body."
+          };
+        axios({
+                    method:"post",
+                    data:data,
+                    url:result.url+"/cf/producer/v1/resource-events",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + result.access_token,
+                    }
+        }).then(function(response){
+            resolve(response);
+        }).catch(error=>{
+            resolve(error)
+        })
+        });
+}
 
 
 function readMessage(res)
 {
-
-    getCredentials().then((result)=>{
-        connection.connect(result,(err)=>{
-            if(err)
-            {
-                console.log("connection error"+err);
-                return;
-            }
-            connected=true;
-        })
-    })
-
-    client = new msg.Client(options);
-    //------------------------------------------------------------------------------------------------------------------
-    // Messaging client handler methods
-    //------------------------------------------------------------------------------------------------------------------
-
-    client
-    .on('connected', () => {
-      console.log('connected to enterprise messaging service');
-    })
-    .on('error', (err) => {
-      console.log('error on enterprise messaging service occurred ' + err);
-    })
-    .on('disconnected', (hadError) => {
-      console.log('connection to enterprise messaging service lost, trying to reconnect in ' + reconnect_retry_ms + ' ms');
-      setTimeout(()=> client.connect(), reconnect_retry_ms);
-    });
-
-    //------------------------------------------------------------------------------------------------------------------
-    // Input stream handler methods
-    //------------------------------------------------------------------------------------------------------------------
-
-    client.istream(inputX)
-    .on('subscribed', () => {
-      console.log('subscribed to ' + inputX);
-    })
-    .on('ready', () => {
-      console.log('stream ready: ' + inputX);
-    })
-    .on('data', (message) => {
-      let topic = 'dummy';
-      if (message.source) {
-          if (typeof message.source === 'string') {
-              topic = message.source;
-          } else if (message.source.topic) {
-              topic = message.source.topic;
-          }
-      }
-      const handler = ()=>{
-          console.log("timeout Function");
-        insertMessageIntoDB(message.payload.toString(),res);
-      }
-      setTimeout(handler, getRandomInt(1, 11));
-
-      //------------------------------------------------------------------------------------------------------------------
-      // Write the message payload to the log file
-      //------------------------------------------------------------------------------------------------------------------
-
-      console.log('message received: ' + message.payload.toString());
-      message.done();
-      //insertMessageIntoDB(message.payload.toString(),res); 
-    });
-    client.connect();
 }
 
 function sendMessage(){
-    console.log("start messaging")
-
-    client
-    .on('connected', () => {
-        console.log('connected');
-        initTasks(taskList, client);
-    })
-    .on('drain', () => {
-        console.log('continue');
-    })
-    .on('error', (error) => {
-        console.log(error);
+}
+function sendNotification(req,res)
+{
+    getAlertCredentials().then((result)=>{
+        return getAlertOAuthToken(result);
+    }).then((result)=>{
+      return sendNotificationFunction(result);
+    }).then(()=>{
+        res.send({result:"sent a event"});
     });
-    client.connect();
-
+    
 }
-
-function setupOptions(tasks, options) {
-    Object.getOwnPropertyNames(tasks).forEach((id) => {
-        const task = tasks[id];
-        options.destinations[0].ostreams[id] = {
-            channel: 1,
-            exchange: 'amq.topic',
-            routingKey: task.topic
-        };
-    });
-    return options;
-}
-
-function getRandomInt(min, max) {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return (Math.floor(Math.random() * (max - min + 1)) + min) * 1000;
-}
-
-function initTasks(tasks, client) {
-    Object.getOwnPropertyNames(tasks).forEach((id) => {
-        const task = tasks[id];
-        const stream = client.ostream(id);
-
-        const handler = () => {
-            console.log('publishing message number ' + counter + ' to topic ' + task.topic);
-
-            const message = {
-                target: { address: 'topic:' + task.topic },
-                payload: Buffer.from("Demo Message Number " + counter)
-
-            };
-            if (!stream.write(message)) {
-                console.log('wait');
-                return;
-            }
-            //setTimeout(handler, getRandomInt(task.timerMin, task.timerMax));
-            counter++;
-        };
-
-        stream.on('drain', () => {
-            //setTimeout(handler, getRandomInt(task.timerMin, task.timerMax));
-        });
-
-        setTimeout(handler, getRandomInt(task.timerMin, task.timerMax));
-    });
-}
-
 
 module.exports = {
     getMessageFromDB:getMessageFromDB,
     sendMessage: sendMessage,
     readMessage:readMessage,
-    insertMessageIntoDB:insertMessageIntoDB
+    insertMessageIntoDB:insertMessageIntoDB,
+    sendNotification:sendNotification
 }
