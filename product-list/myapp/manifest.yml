@@ -1,6 +1,6 @@
 applications:
 # Product List Application
-- name: educationTime
+- name: demoPostgresqlAndObject
   instances: 1
   memory: 128M
  # routes:
@@ -9,5 +9,6 @@ applications:
   buildpack: https://github.com/cloudfoundry/nodejs-buildpack
   timeout: 180
   services:
-    - educationTime-hdidb-kevinyang02sapnm1WGmRPC2yiZZH0 
+    - pgdb
     - logs
+    - objectStoreDemo

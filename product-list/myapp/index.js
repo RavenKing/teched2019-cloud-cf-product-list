@@ -1,6 +1,6 @@
 const express = require('express');
 var log = require('cf-nodejs-logging-support');
-const { sendMessage,readMessage,getMessageFromDB,insertMessageIntoDB,sendNotification} = require('./lib/destination');
+const { s3read,s3upload,getMessageFromDB,insertMessageIntoDB,sendNotification} = require('./lib/destination');
 const app = express();
 const port = process.env.port || 8080;
 
@@ -14,14 +14,24 @@ app.use(log.logNetwork);
 // const xsenv = require('@sap/xsenv');
 app.use(bodyParser.urlencoded({extended:false}));
 app.use(bodyParser.json());
-app.get('/educationTime',checkReadScope, dbGet);
+app.get('/readPGtable',checkReadScope, dbGet);
+app.get('/uploadS3',checkReadScope, uploadtoAws);
+app.get('/readFromS3',checkReadScope, readFromAws);
 app.get('/alertNotification',checkReadScope, sendNotificationF);
-app.post('/educationTime',checkReadScope, insertMessageTest);
+app.post('/insertPGTable',checkReadScope, insertMessageTest);
 
+function readFromAws(req,res)
+{
+	s3read(res,req)
+}
+function uploadtoAws(req,res)
+{
+	s3upload(res,req);
+}
 function insertMessageTest(req,res)
 {	
 	console.log(req.body);
-	insertMessageIntoDB(req.body,res);
+	insertMessageIntoDB(req.body,res,req);
 
 }
 function sendNotificationF(req,res)

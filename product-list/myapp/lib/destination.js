@@ -1,173 +1,158 @@
 'use strict';
-const xsenv = require('@sap/xsenv');
 const request = require('request');
 const axios = require('axios');
+const xsenv = require('@sap/xsenv');
+　　var fs=require("fs");
 
+var AWS = require('aws-sdk');
+const pgsql=require('pg');
+let connection=null;
+var s3 = new AWS.S3({
+    accessKeyId:"AKIASRWQYWCK572BLMGS",
+    secretAccessKey:"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"
+});
 
-const hanaClient=require("@sap/hana-client");
-const connection = hanaClient.createConnection();
-
-function insertMessageIntoDB(data,res)
+const params = {
+    Bucket: "hcp-c7c8caee-ade9-41b7-99be-fc48e5cb8dea",
+    Key: 'test1.txt' // File name you want to save as in S3
+};
+function s3upload(res,req){
+    const params = {
+        Bucket: "hcp-c7c8caee-ade9-41b7-99be-fc48e5cb8dea",
+        Key: 'test1.txt'// File name you want to save as in S3
+    };
+    fs.writeFile('./newTest.txt', 'Kevin Yang I077541', { 'flag': 'a' }, function(err) {
+        if (err) {
+            throw err;
+        } 
+        // 写入成功后读取测试
+        fs.readFile('./newTest.txt', 'utf-8', function(err, data) {
+            if (err) {
+                throw err;
+            }
+            params.Body=data;
+            console.log(data);
+            s3.putObject(params,function(err,data)
+            {
+            if (err) {
+                    throw err;
+                }
+                res.send(data);
+            });
+        });
+    });
+   
+    // fs.readFile("test.txt", function(err, data) {//readFile F一定要大写
+    //          if(err){
+    //              console.log(err + "打开文件夹错误");
+    //              return;
+    //          }  
+    //          console.log(data);
+    //          const params = {
+    //             Bucket: "hcp-c7c8caee-ade9-41b7-99be-fc48e5cb8dea",
+    //             Key: 'test.txt', // File name you want to save as in S3
+    //             Body: data
+    //         };
+    //          s3.upload(params, function(err, data) {
+    //             if (err) {
+    //                 throw err;
+    //             }
+    //             console.log(`File uploaded successfully. ${data.Location}`);
+    //         });
+    //  });
+  
+}
+function insertMessageIntoDB(data,res,req)
 {
 
-    getCredentials().then((result)=>{
-        return insertDBMessage(data,result)
+    getCredentials(req).then((result)=>{
+        return insertDBMessage(data,result,req)
       }).then((result)=>{
           console.log(result);
           res.send({reply:result});
       });
 }
-function insertDBMessage(data,result)
+function insertDBMessage(data,result,req)
 {
     return new Promise(function(resolve)
     {
-        connection.connect(result,(err)=>{
-            
-            console.log("getData"+data);
-            if(data.eduData.length>0)
-            {
-                for(var i=0;i<data.eduData.length;i++)
-                {
-                    var sql="INSERT INTO \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::edu_master.educationTime\" VALUES('"+data.user_id+"','"+
-                    data.calendar_week+"','"+data.eduData[i].edu_source+"','"+data.eduData[i].edu_topic+"',"
-                    +data.eduData[i].edu_duration+",'"+data.user_name+"','"+data.eduData[i].comment+"','"
-                    +data.eduData[i].edu_area+"','"+data.certificate_source+"','"+data.certificate_topic+"','"
-                    +data.certificate_area+"','"+data.team+"')";
-                      connection.exec(sql,(err,rows)=>{
-                        console.log(rows);
-                    })
-                }
-            }
-            
-            resolve("done")
-
-            
-
+        if(connection==null)
+        {
+            connection= new pgsql.Pool(result);
+        }
+        var sql="insert into demo.\"demoName\" values('"+data.firstName+"','"+data.lastName+"',"+data.id+")";
+        connection.query(sql,(err,result)=>{  
+        if(err)
+        {
+            req.logger.error(err.message);
+        }
+        req.logger.info(result);
+        resolve(result);            
         })
     });
 }
 function getMessageFromDB(req,res)
 {
-     getCredentials().then((result)=>{
+     getCredentials(req).then((result)=>{
     req.logger.info("Credential got");
-      return getDBConnection(result)
+      return getDBConnection(result,req)
     }).then((result)=>{
         //console.log(result);
     req.logger.warn("DB connected");
         res.send(result);
     });
 }
-function getDBConnection(result)
+function getDBConnection(result,req)
 {
     return new Promise(function(resolve)
     {
-        connection.connect(result,(err)=>{
-         var sql="select * from  \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::edu_master.educationTime\"";
-            console.log(sql);
-            console.log(err);
-            connection.exec(sql,(err,rows)=>{
-                console.log(err);
-                console.log(rows);  
-                connection.disconnect();
-                resolve(rows);
+        connection= new pgsql.Pool(result);
+         var sql="select * from  demo.\"demoName\"";
+    connection.query(sql,function(err,result,fields){
+        if(err)
+        {
+            req.logger.warn(err.message);
+        }
+        req.logger.info(result);
+        connection.end();
+        resolve(result);
+    });
 
-            })
-        })
     });
 }
-function getCredentials()
+function getCredentials(req)
 {
     return new Promise(function(resolve)
     {
-        const hanaService=xsenv.getServices({
-            hanatrial:{
-                tag:'hana'
+        console.log("get credential")
+        const pgService=xsenv.getServices({
+            postgresql:{
+                tag:'postgresql'
             }
-        }).hanatrial
-       // console.log(hanaService);
+        }).postgresql;
+        req.logger.info(pgService); 
         const result = {
-            host: hanaService.host,
-            port: hanaService.port,
-            uid: hanaService.user,
-            pwd: hanaService.password,
-            sslValidateCertificate : "false",
-            encrypt: "true",
-            databaseName:"H00"   
+            host: pgService.hostname,
+            port: pgService.port,
+            user: pgService.username,
+            password: pgService.password,
+            database:pgService.dbname
         }
+        req.logger.info(result);
+         console.log(result);
         resolve(result);
     });
 }
 
 function getAlertCredentials()
 {
-    return new Promise(function(resolve)
-    {
-        const hanaService=xsenv.getServices({
-            alert:{
-                label:'alert-notification'
-            }
-        }).alert
-        console.log(hanaService);
-    
-        resolve(hanaService);
-    });
+
 }
 function getAlertOAuthToken(result)
 {
-    return new Promise(function(resolve){
-        request({
-            url: result.oauth_url,
-            method: 'POST',
-            json: true,
-            form: {
-                grant_type: 'client_credentials',
-                client_id: result.client_id
-            },
-            auth: {
-                user: result.client_id,
-                pass: result.client_secret
-            }
-        },
-            function (error, response, body) {
-                if (error) {
-                    reject(error);
-                } else {
-                    body.url=result.url;
-                    resolve(body);
-                }
-            });
-    });
 }
 function sendNotificationFunction(result)
 {
-    return new Promise(function(resolve){
-
-        var data ={
-            "eventType": "good",
-            "eventTimestamp": 1535618178,
-            "resource": {
-                "resourceType":"kevin",
-                "resourceName":"Yangcf"
-            },
-            "severity": "FATAL",
-            "category": "ALERT",
-            "subject": "Sample Event Subject",
-            "body": "Sample event body."
-          };
-        axios({
-                    method:"post",
-                    data:data,
-                    url:result.url+"/cf/producer/v1/resource-events",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": "Bearer " + result.access_token,
-                    }
-        }).then(function(response){
-            resolve(response);
-        }).catch(error=>{
-            resolve(error)
-        })
-        });
 }
 
 
@@ -179,20 +164,24 @@ function sendMessage(){
 }
 function sendNotification(req,res)
 {
-    getAlertCredentials().then((result)=>{
-        return getAlertOAuthToken(result);
-    }).then((result)=>{
-      return sendNotificationFunction(result);
-    }).then(()=>{
-        res.send({result:"sent a event"});
-    });
-    
 }
-
+function s3read(res,req)
+{ 
+    
+    s3.getObject(params,function(err,data){
+    console.log(data);
+    console.log(data.Body);
+    var stringNew= Buffer.from(data.Body);
+    var stringConverted= stringNew.toString("utf-8");
+    res.send(stringConverted);
+});
+}
 module.exports = {
     getMessageFromDB:getMessageFromDB,
     sendMessage: sendMessage,
     readMessage:readMessage,
     insertMessageIntoDB:insertMessageIntoDB,
-    sendNotification:sendNotification
+    sendNotification:sendNotification,
+    s3upload:s3upload,
+    s3read:s3read
 }
