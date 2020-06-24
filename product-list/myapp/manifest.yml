@@ -11,4 +11,4 @@ applications:
   timeout: 180
   services: 
     - educationTime-hdidb-kevinyang02sapnm1WGmRPC2yiZZH0
-    - myaccess
+    - xsuaa

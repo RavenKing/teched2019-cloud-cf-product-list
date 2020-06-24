@@ -1,262 +1,194 @@
 'use strict';
-const request = require('request');
 const xsenv = require('@sap/xsenv');
-const API_EndPoint = "backendOnpremise";
-var globalconnectivityToken;
-/***
- * Extract client id, client secret and url from the bound Destinations service VCAP_SERVICES object
- *
- * when the promise resolves it returns a clientid, clientsecret and url of the token granting service
- *
- * @returns {Promise<any>}
- */
-function getCredentials() {
-    return new Promise(function (resolve) {
-        const destination = xsenv.getServices({
-            destination: {
-                tag: 'destination'
+const request = require('request');
+const axios = require('axios');
+
+
+const hanaClient=require("@sap/hana-client");
+const connection = hanaClient.createConnection();
+
+function insertMessageIntoDB(data,res)
+{
+
+    getCredentials().then((result)=>{
+        return insertDBMessage(data,result)
+      }).then((result)=>{
+          console.log(result);
+          res.send({reply:result});
+      });
+}
+function insertDBMessage(data,result)
+{
+    return new Promise(function(resolve)
+    {
+        connection.connect(result,(err)=>{
+            
+            console.log("getData"+data);
+            if(data.eduData.length>0)
+            {
+                for(var i=0;i<data.eduData.length;i++)
+                {
+                    var sql="INSERT INTO \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::edu_master.educationTime\" VALUES('"+data.user_id+"','"+
+                    data.calendar_week+"','"+data.eduData[i].edu_source+"','"+data.eduData[i].edu_topic+"',"
+                    +data.eduData[i].edu_duration+",'"+data.user_name+"','"+data.eduData[i].comment+"','"
+                    +data.eduData[i].edu_area+"','"+data.certificate_source+"','"+data.certificate_topic+"','"
+                    +data.certificate_area+"','"+data.team+"')";
+                      connection.exec(sql,(err,rows)=>{
+                        console.log(rows);
+                    })
+                }
             }
-        }).destination;
-
-        const credentials = {
-            clientid: destination.clientid,
-            clientsecret: destination.clientsecret,
-            url: destination.url
-        };
-
-        resolve(credentials);
+            resolve("done")
+        })
     });
 }
-function getConnectivityCredentials() {
-    return new Promise(function (resolve) {
-        const connectivity = xsenv.getServices({
-            connectivity: {
-                tag: 'connectivity'
+function getMessageFromDB(req,res)
+{
+     getCredentials().then((result)=>{
+    req.logger.info("Credential got");
+      return getDBConnection(result)
+    }).then((result)=>{
+        //console.log(result);
+    req.logger.warn("DB connected");
+        res.send(result);
+    });
+}
+function getDBConnection(result)
+{
+    return new Promise(function(resolve)
+    {
+        connection.connect(result,(err)=>{
+         var sql="select * from  \"EDUCATIONTIME_HDI_DB_1\".\"educationTime.db::edu_master.educationTime\"";
+            console.log(sql);
+            console.log(err);
+            connection.exec(sql,(err,rows)=>{
+                console.log(err);
+                console.log(rows);  
+                connection.disconnect();
+                resolve(rows);
+
+            })
+        })
+    });
+}
+function getCredentials()
+{
+    return new Promise(function(resolve)
+    {
+        const hanaService=xsenv.getServices({
+            hanatrial:{
+                tag:'hana'
             }
-        }).connectivity;
-
-        const connectivitycredentials = {
-            proxy: "http://" + connectivity.onpremise_proxy_host + ":" + connectivity.onpremise_proxy_port,
-            clientid: connectivity.clientid,
-            clientsecret: connectivity.clientsecret,
-            url: connectivity.url
-        };
-
-        resolve(connectivitycredentials);
+        }).hanatrial
+       // console.log(hanaService);
+        const result = {
+            host: hanaService.host,
+            port: hanaService.port,
+            uid: hanaService.user,
+            pwd: hanaService.password,
+            sslValidateCertificate : "false",
+            encrypt: "true",
+            databaseName:"H00"   
+        }
+        resolve(result);
     });
 }
 
-function getConnectivityReady() {
-    getConnectivityCredentials().then((credentials) => {
-        createToken(credentials.url, credentials.clientid, credentials.clientsecret).then((connectivityToken) => {
-            globalconnectivityToken = connectivityToken
-        });
-
+function getAlertCredentials()
+{
+    return new Promise(function(resolve)
+    {
+        const hanaService=xsenv.getServices({
+            alert:{
+                label:'alert-notification'
+            }
+        }).alert
+        console.log(hanaService);
+    
+        resolve(hanaService);
     });
 }
-/***
- * This creates a token for us from the supplied token granting service url, the clientid and the client
- * secret when the promise resolves
- *
- * The return value when the promise resolves is an object and not a string. The request API will turn the response
- * from a string into an object for us.
- *
- * @param destAuthUrl : url of the destination service token granting service - you will still need to append /oath/token to the url
- * @param clientId: the clientId used to get a token from the
- * @param clientSecret : the password to get a token
- * @returns {Promise<any>}
- */
-function createToken(destAuthUrl, clientId, clientSecret) {
-    return new Promise(function (resolve, reject) {
-        // we make a post using x-www-form-urlencoded encoding for the body and for the authorization we use the
-        // clientid and clientsecret.
-        // Note we specify a grant_type and client_id as required to get the token
-        // the request will return a JSON object already parsed
+function getAlertOAuthToken(result)
+{
+    return new Promise(function(resolve){
         request({
-            url: `${destAuthUrl}/oauth/token`,
+            url: result.oauth_url,
             method: 'POST',
             json: true,
             form: {
                 grant_type: 'client_credentials',
-                client_id: clientId
+                client_id: result.client_id
             },
             auth: {
-                user: clientId,
-                pass: clientSecret
+                user: result.client_id,
+                pass: result.client_secret
             }
         },
             function (error, response, body) {
                 if (error) {
                     reject(error);
                 } else {
-                    resolve(body.access_token);
+                    body.url=result.url;
+                    resolve(body);
                 }
             });
     });
 }
+function sendNotificationFunction(result)
+{
+    return new Promise(function(resolve){
 
-/***
- * This gets the destination using the supplied access token. We generated the access token using
- * createToken above.
- *
- * The destination has the uri field that holds the server(url) that will enable us to get the
- * destination details.
- *
- * -----------------------------------------
- * NOTE WE ASSUME A DESTINATION OF testdest
- * -----------------------------------------
- *
- * As above we do a GET request but instead of authentication we supply a bearer and access token
- * which give us access to the destination service for our service.
- *
- * The return value when the promise resolves is an object and not a string. The request API will turn the response
- * from a string into an object for us.
- *
- * @param access_token : the access token giving us access to the destination service
- * @param destinationName : the name of the destination to retrieve.
- * @returns {Promise<any>}
- */
-function getDestination(access_token, destinationName) {
-    return new Promise(function (resolve, reject) {
-        const destination = xsenv.getServices({ destination: { tag: 'destination' } }).destination;
-        console.log("ACCESS TOKEN = " + access_token);
-        // Note that we use the uri and not the url!!!!
-
-        request({
-            url: `${destination.uri}/destination-configuration/v1/destinations/${destinationName}`,
-            method: 'GET',
-            auth: {
-                bearer: access_token,
+        var data ={
+            "eventType": "good",
+            "eventTimestamp": 1535618178,
+            "resource": {
+                "resourceType":"kevin",
+                "resourceName":"Yangcf"
             },
-            json: true,
-        },
-            function (error, response, body) {
-                if (error) {
-                    console.error(`Error retrieving destination ${error.toString()}`);
-                    reject(error);
-                } else {
-                    // console.log(`Retrieved destination ${JSON.stringify(body)}`);
-                    resolve(body.destinationConfiguration);
-                }
-            });
-    });
+            "severity": "FATAL",
+            "category": "ALERT",
+            "subject": "Sample Event Subject",
+            "body": "Sample event body."
+          };
+        axios({
+                    method:"post",
+                    data:data,
+                    url:result.url+"/cf/producer/v1/resource-events",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + result.access_token,
+                    }
+        }).then(function(response){
+            resolve(response);
+        }).catch(error=>{
+            resolve(error)
+        })
+        });
 }
 
-function readOrderDetailsDestinationUrl() {
-    const destinationCool = xsenv.getServices({
-        destination: {
-            tag: 'destination'
-        }
-    }).destination;
-    return new Promise(function (resolve, reject) {
-        getCredentials()
-            .then(function (credentials) {
-                return createToken(credentials.url, credentials.clientid, credentials.clientsecret)
-            })
-            .then(function (access_token) {
-                return getDestination(access_token, API_EndPoint);
-            })
-            .then(function (destination) {
-                const url = `${destination.URL}`;
-                // console.log("credential:" + json.stringify(destination));
-                console.log(`Accessing ODATA URL ${url}`);
-                resolve({
-                    url: url,
-                    user: destination.User,
-                    password: destination.Password
-                });
-            })
-            .catch(function (error) {
-                console.error(`Error getting Order_Details destination URL`);
-                reject(error);
-            })
-    });
+
+function readMessage(res)
+{
 }
 
-function readOrderDetails(req, res, next) {
-
-    res.send({
-        replies: [{
-            type: 'text',
-            content: "We have " + 10 + "entities"
-        }],
-    });
-
-    const connectivity = xsenv.getServices({
-        connectivity: {
-            tag: 'connectivity'
-        }
-    }).connectivity;
-    const connectivitycredentials = {
-        proxy: "http://" + connectivity.onpremise_proxy_host + ":" + connectivity.onpremise_proxy_port,
-        clientid: connectivity.clientid,
-        clientsecret: connectivity.clientsecret,
-        url: connectivity.url
-    };
-    return new Promise(function (resolve, reject) {
-        console.log(`Getting destination url for Order_Details odata collection`);
-        readOrderDetailsDestinationUrl()
-            .then(function (result) {
-                console.log(`Read destiantion url ${result.url}`);
-                const final_url = result.url;
-                getConnectivityCredentials().then(function (connectivityCre) {
-
-                    return createToken(connectivityCre.url, connectivityCre.clientid, connectivityCre.clientsecret);
-                    //connectivityCre.
-                }).then((connectivity_access_token) => {
-                    console.log("connectivi prepared:" + result.user + "///token");
-                    var options = {
-                        // uri: dataObj.destinationConfiguration.URL + odata_path + "('" + odata_key_value + "')?$format=json",
-                        proxy: connectivitycredentials.proxy,
-                        uri: final_url,
-                        //proxy: getConnectivityCredentials().then(),
-                        headers: {
-                            "Content-Type": "application/json",
-                            "x-csrf-token": "Fetch",
-                            "Authorization": "Basic " + new Buffer(result.user + ":" + result.password).toString("base64"),
-                            "Proxy-Authorization": "Bearer " + connectivity_access_token,
-                            "SAP-Connectivity-SCC-Location_ID": "Shenzhen"
-                        }
-                    };
-                    request.get(options, function (error, response) {
-
-                        //console.log(response);
-                        console.log(response.body)
-                        var ste = JSON.parse(response.body);
-                        console.log(ste);
-                        res.send({
-                            replies: [{
-                                type: 'text',
-                                content: "We have " + ste.d.EntitySets.length + "entities"
-                            }],
-                        });
-                    });
-
-
-                });
-
-                //     request({
-                //         method: 'GET',
-                //         url: `${url}/v2/northwind/northwind.svc/Order_Details`,
-                //         json: true
-                //     }, function (error, response) {
-                //         if (error) {
-                //             console.error(`Error getting odata from Order_Details API ${error.toString()}`);
-                //             reject(error);
-                //         } else {
-                //             console.log(`Received Odata from wishlist API`);
-                //             console.log(response.body);
-                //             res.send(response.body);
-                //         }
-                //     })
-                // })
-                // .catch(function (error) {
-                //     console.error(`Failed reading Order_Details data - ${error.toString()}`);
-                //     reject(error);
-                // });
-            });
-    });
+function sendMessage(){
 }
+function sendNotification(req,res)
+{
+    getAlertCredentials().then((result)=>{
+        return getAlertOAuthToken(result);
+    }).then((result)=>{
+      return sendNotificationFunction(result);
+    }).then(()=>{
+        res.send({result:"sent a event"});
+    });
+    
+}
+
 module.exports = {
-    readOrderDetails: readOrderDetails
+    getMessageFromDB:getMessageFromDB,
+    sendMessage: sendMessage,
+    readMessage:readMessage,
+    insertMessageIntoDB:insertMessageIntoDB,
+    sendNotification:sendNotification
 }
