@@ -1,19 +1,19 @@
 {
-	"xsappname": "sccdemo",
+	"xsappname": "product-NewList",
 	"tenant-mode": "dedicated",
 	"scopes": [
 		{
-			"name": "uaa.user",
+			"name": "$XSAPPNAME.read",
 			"description": "With this scope, USER can read products."
 		}
 	],
 
 	"role-templates": [
 		{
-			"name": "Token_Exchange",
+			"name": "Reader",
 			"description": "Role to get the list of products",
 			"scope-references": [
-				"uaa.user"
+				"$XSAPPNAME.read"
 			]
 		}
 	]

@@ -1,5 +1,5 @@
 const express = require('express');
-const { getProducts, getProductsByName} = require('./lib/repository');
+const { getProducts} = require('./lib/repository');
 const { readOrderDetails} = require('./lib/destination');
 const app = express();
 const port = process.env.port || 8080;
@@ -16,13 +16,13 @@ app.use(passport.authenticate('JWT', { session: false }));
 
 app.get('/products',checkReadScope, getProducts);
  //app.get('/token',checkReadScope, getJWTToken);
-app.get('/orders',checkReadScope, readOrderDetails);
+app.get('/home', getJWTToken);
 
-// function getJWTToken(req,res)
-// {
-// 	const authHeader=req.headers['authorization'];
-//    res.send(authHeader.split(' ')[1]);
-// }
+function getJWTToken(req,res)
+{
+	const authHeader=req.headers['authorization'];
+   res.send(authHeader.split(' ')[1]);
+}
 
 // Scope check
 function checkReadScope(req, res, next) {
